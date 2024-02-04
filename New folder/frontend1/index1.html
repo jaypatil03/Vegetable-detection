@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<link rel="stylesheet" href="styles.css">
+<html>
+<head>
+    <title>Image Upload Form</title>
+</head>
+<body>
+    <h1>Image Classification 1</h1>
+    <form id="upload-form">
+        <input type="file" id="image-upload" accept="image" required>
+        <button type="submit">Upload and Classify</button>
+    </form>
+    <div id="result">
+        <!-- Display the classification result here -->
+    </div>
+    <div>
+        <img id="image-preview" src="" alt="Uploaded Image" style="max-width: 100%; max-height: 300px;">
+    </div>
+
+
+    <script>
+        document.getElementById('upload-form').addEventListener('submit', async (e) => {
+            e.preventDefault(); // Prevent the default form submission behavior
+
+            const formData = new FormData();
+            const resizedImageBlob = await resizeImage(document.getElementById('image-upload').files[0]);
+            formData.append('file', resizedImageBlob);
+
+            try {
+                const response = await fetch('http://localhost:8000/predict', {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('result').innerText = `Class: ${data.class}, Confidence: ${data.confidence.toFixed(2)}`;
+                } else {
+                    document.getElementById('result').innerText = 'Error occurred during classification.';
+                }
+            } catch (error) {
+                console.error('API request failed:', error);
+                document.getElementById('result').innerText = 'API request failed.';
+            }
+        });
+
+        // Update image preview when a file is selected
+        document.getElementById('image-upload').addEventListener('change', (e) => {
+            const imagePreview = document.getElementById('image-preview');
+            const file = e.target.files[0];
+
+            if (file) {
+                const imageUrl = URL.createObjectURL(file);
+                imagePreview.src = imageUrl;
+            } else {
+                imagePreview.src = ''; // Clear the image preview
+            }
+        });
+
+        async function resizeImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = 256;
+                        canvas.height = 256;
+
+                        // Calculate the scaling factors to maintain aspect ratio
+                        const scaleFactor = Math.min(256 / img.width, 256 / img.height);
+
+                        // Calculate the new dimensions
+                        const newWidth = img.width * scaleFactor;
+                        const newHeight = img.height * scaleFactor;
+
+                        // Calculate the position to center the image on the canvas
+                        const x = (256 - newWidth) / 2;
+                        const y = (256 - newHeight) / 2;
+
+                        // Draw the image on the canvas with the new dimensions and position
+                        ctx.drawImage(img, x, y, newWidth, newHeight);
+
+                        // Convert the canvas to a Blob
+                        canvas.toBlob((blob) => {
+                            resolve(blob);
+                        }, 'image/jpeg', 1);
+                    };
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+
+    </script>
+</body>
+</html>
